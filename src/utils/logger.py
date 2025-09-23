@@ -33,4 +33,8 @@ def setup_logger(
 
     return logger
 
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger instance for the given module name"""
+    return setup_logger(name=name)
+
 logger = setup_logger()

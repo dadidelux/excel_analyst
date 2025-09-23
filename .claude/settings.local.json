@@ -4,7 +4,11 @@
       "Bash(python:*)",
       "Bash(.venvScriptsactivate.bat)",
       "Bash(pip install:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(dir)",
+      "Bash(dir:*)",
+      "Bash(dir \"src\\agents\")",
+      "Bash(\"venv\\Scripts\\activate.bat\")"
     ],
     "deny": [],
     "ask": []
