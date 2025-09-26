@@ -281,7 +281,7 @@ class QueryParser:
         original_query: str
     ) -> QueryIntent:
         """Extract structured intent from regex match"""
-        intent = QueryIntent(query_type=query_type)
+        intent = QueryIntent(query_type=query_type, primary_columns=[])
 
         for i, group_name in enumerate(group_names):
             if i < len(match.groups()) and match.group(i + 1):
