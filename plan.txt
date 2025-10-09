@@ -1,0 +1,14 @@
+I wanna build ang langgraph agent 
+
+that I will lets say load a csv then 
+
+it will let me query
+
+then lets say my query is "Compare store vs non-store sales performance and see if there is a connection with store sales to non-store sales over time, please provide a chart to help illustrate"
+
+it will then provide anything analysis then will save it to a sheet
+
+basically the final outcome is the actual data that was loaded 
+in and the analysis on another sheet but basically same file
+also it shows the tables and charts in the excel sheet
+

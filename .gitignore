@@ -182,7 +182,6 @@ cache/
 # Backup files
 *.bak
 *.backup
-plan.txt
 
 # YoYo AI version control directory
 .yoyo/
