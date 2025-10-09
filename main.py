@@ -21,11 +21,12 @@ def main():
     parser = argparse.ArgumentParser(description="Excel Agent - CSV Analysis to Excel Reports")
 
     parser.add_argument("csv_file", help="Path to CSV file to analyze")
-    parser.add_argument("query", help="Natural language query for analysis")
+    parser.add_argument("queries", nargs="*", help="Natural language query/queries for analysis")
     parser.add_argument("--output", "-o", help="Output Excel filename")
     parser.add_argument("--preview", "-p", action="store_true", help="Show data preview only")
     parser.add_argument("--suggest", "-s", action="store_true", help="Show suggested queries")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--queries-file", "-q", help="File containing queries (one per line)")
 
     args = parser.parse_args()
 
@@ -56,23 +57,51 @@ def main():
                 print(f"   {i}. {suggestion}")
             return
 
-        # Run full analysis workflow
-        print("🚀 Starting Excel Agent analysis...")
-        print(f"📁 File: {args.csv_file}")
-        print(f"❓ Query: {args.query}")
-        print()
+        # Get queries from file or command line
+        queries = []
+        if args.queries_file:
+            print(f"📄 Loading queries from: {args.queries_file}")
+            with open(args.queries_file, 'r', encoding='utf-8') as f:
+                queries = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+        elif args.queries:
+            queries = args.queries
+        else:
+            print("❌ Error: Query is required. Use -p for preview or -s for suggestions.")
+            return
 
-        # Process file and query with progress bar
-        with tqdm(total=5, desc="Progress", unit="step") as pbar:
-            pbar.set_description("Loading CSV")
-            pbar.update(1)
+        # Handle multiple queries
+        if len(queries) > 1:
+            print("🚀 Starting Excel Agent analysis (Multiple Queries Mode)...")
+            print(f"📁 File: {args.csv_file}")
+            print(f"❓ Queries ({len(queries)}):")
+            for i, q in enumerate(queries, 1):
+                print(f"   {i}. {q}")
+            print()
 
-            result = agent.process_file_and_query(
+            result = agent.analyze_multiple_queries(
                 csv_file_path=args.csv_file,
-                query=args.query,
-                excel_filename=args.output,
-                progress_callback=lambda step: (pbar.set_description(step), pbar.update(1))
+                queries=queries,
+                excel_filename=args.output
             )
+        else:
+            # Single query workflow
+            query = queries[0]
+            print("🚀 Starting Excel Agent analysis...")
+            print(f"📁 File: {args.csv_file}")
+            print(f"❓ Query: {query}")
+            print()
+
+            # Process file and query with progress bar
+            with tqdm(total=5, desc="Progress", unit="step") as pbar:
+                pbar.set_description("Loading CSV")
+                pbar.update(1)
+
+                result = agent.process_file_and_query(
+                    csv_file_path=args.csv_file,
+                    query=query,
+                    excel_filename=args.output,
+                    progress_callback=lambda step: (pbar.set_description(step), pbar.update(1))
+                )
 
         # Display results
         print("📋 Workflow Results:")

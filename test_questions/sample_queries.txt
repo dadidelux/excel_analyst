@@ -1,0 +1,5 @@
+# Sample queries for sales data analysis
+Compare store vs non-store sales performance
+What are the top performing categories by total sales?
+Show correlation between customer rating and sales
+Analyze sales trends over time

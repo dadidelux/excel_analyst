@@ -130,16 +130,16 @@ dmypy.json
 .pyre/
 
 # Excel Agent specific
-data/*.csv
-data/*.xlsx
-data/*.xls
-outputs/*.xlsx
-outputs/*.xls
-outputs/*.png
-outputs/*.jpg
-outputs/*.jpeg
-outputs/*.svg
-*.log
+# data/*.csv
+# data/*.xlsx
+# data/*.xls
+# outputs/*.xlsx
+# outputs/*.xls
+# outputs/*.png
+# outputs/*.jpg
+# outputs/*.jpeg
+# outputs/*.svg
+# *.log
 
 # IDE and editor files
 .vscode/

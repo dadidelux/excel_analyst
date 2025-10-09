@@ -82,7 +82,8 @@ class ExcelAgent:
         csv_file_path: str,
         query: str,
         excel_filename: Optional[str] = None,
-        export_config: Optional[ExcelExportConfig] = None
+        export_config: Optional[ExcelExportConfig] = None,
+        progress_callback: Optional[callable] = None
     ) -> AgentWorkflowResult:
         """
         Complete workflow: Load CSV, parse query, analyze data, generate charts, export to Excel
@@ -92,6 +93,7 @@ class ExcelAgent:
             query: Natural language query
             excel_filename: Optional output Excel filename
             export_config: Optional Excel export configuration
+            progress_callback: Optional callback function for progress updates
 
         Returns:
             AgentWorkflowResult with complete workflow results
@@ -123,6 +125,8 @@ class ExcelAgent:
                 return result
 
             # Step 2: Parse and validate query
+            if progress_callback:
+                progress_callback("Parsing query")
             result.messages.append("Parsing natural language query...")
             try:
                 # Set data context for parser
@@ -152,6 +156,8 @@ class ExcelAgent:
                 return result
 
             # Step 3: Perform data analysis
+            if progress_callback:
+                progress_callback("Running analysis")
             result.messages.append("Performing data analysis...")
             try:
                 # Set data for analyzer
@@ -175,6 +181,8 @@ class ExcelAgent:
                 return result
 
             # Step 4: Generate charts
+            if progress_callback:
+                progress_callback("Generating charts")
             result.messages.append("Generating visualizations...")
             try:
                 charts = self.chart_generator.generate_charts_from_analysis(analysis_result)
@@ -195,6 +203,8 @@ class ExcelAgent:
                 # Continue without charts
 
             # Step 5: Export to Excel
+            if progress_callback:
+                progress_callback("Exporting to Excel")
             result.messages.append("Exporting to Excel...")
             try:
                 if not export_config:

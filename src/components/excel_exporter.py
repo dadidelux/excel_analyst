@@ -30,6 +30,17 @@ from ..utils.exceptions import ExcelExportError
 logger = get_logger(__name__)
 
 
+def sanitize_value_for_excel(value):
+    """Sanitize a value to be Excel-compatible"""
+    if isinstance(value, (dict, list, set, tuple)):
+        return str(value)
+    elif pd.isna(value):
+        return None
+    elif isinstance(value, (np.integer, np.floating)):
+        return float(value)
+    return value
+
+
 @dataclass
 class ExcelExportConfig:
     """Configuration for Excel export"""
@@ -336,6 +347,9 @@ class ExcelExporter:
                 # Data rows
                 for data_row in table_data:
                     for col, (key, value) in enumerate(data_row.items(), 1):
+                        # Sanitize value for Excel
+                        value = sanitize_value_for_excel(value)
+
                         cell = ws.cell(row=row, column=col, value=value)
                         if isinstance(value, (int, float)):
                             self._apply_style(cell, self.styles['numeric'])
@@ -454,6 +468,9 @@ class ExcelExporter:
         # Export data
         for r_idx, row in enumerate(dataframe_to_rows(data_to_export, index=False, header=True), start_row):
             for c_idx, value in enumerate(row, 1):
+                # Sanitize value for Excel
+                value = sanitize_value_for_excel(value)
+
                 cell = ws.cell(row=r_idx, column=c_idx, value=value)
 
                 # Apply styling
@@ -572,12 +589,17 @@ class ExcelExporter:
 
     def _auto_adjust_columns(self, ws):
         """Auto-adjust column widths based on content"""
-        for column in ws.columns:
+        from openpyxl.utils import get_column_letter
+
+        for idx, column in enumerate(ws.columns, 1):
             max_length = 0
-            column_letter = column[0].column_letter
+            column_letter = get_column_letter(idx)
 
             for cell in column:
                 try:
+                    # Skip merged cells
+                    if isinstance(cell, openpyxl.cell.cell.MergedCell):
+                        continue
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
