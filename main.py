@@ -7,6 +7,7 @@ Simple CLI for the Excel Agent MVP that demonstrates the complete workflow.
 import sys
 import argparse
 from pathlib import Path
+from tqdm import tqdm
 
 # Add src to path
 sys.path.append(str(Path(__file__).parent / "src"))
@@ -61,12 +62,17 @@ def main():
         print(f"❓ Query: {args.query}")
         print()
 
-        # Process file and query
-        result = agent.process_file_and_query(
-            csv_file_path=args.csv_file,
-            query=args.query,
-            excel_filename=args.output
-        )
+        # Process file and query with progress bar
+        with tqdm(total=5, desc="Progress", unit="step") as pbar:
+            pbar.set_description("Loading CSV")
+            pbar.update(1)
+
+            result = agent.process_file_and_query(
+                csv_file_path=args.csv_file,
+                query=args.query,
+                excel_filename=args.output,
+                progress_callback=lambda step: (pbar.set_description(step), pbar.update(1))
+            )
 
         # Display results
         print("📋 Workflow Results:")
