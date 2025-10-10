@@ -51,6 +51,7 @@ class ExcelExportConfig:
     chart_size: Tuple[int, int] = (600, 400)
     max_rows_per_sheet: int = 1000000
     decimal_places: int = 2
+    use_native_charts: bool = False  # True = Excel native charts, False = embedded images
 
 
 @dataclass
@@ -182,7 +183,7 @@ class ExcelExporter:
 
             # Create Charts sheet
             if config.include_charts and charts:
-                charts_sheet = self._create_charts_sheet(wb, charts)
+                charts_sheet = self._create_charts_sheet(wb, charts, use_native=config.use_native_charts)
                 sheets_created.append("Charts")
                 charts_embedded = len([c for c in charts if c.success])
 
@@ -392,9 +393,10 @@ class ExcelExporter:
     def _create_charts_sheet(
         self,
         wb: Workbook,
-        charts: List[ChartOutput]
+        charts: List[ChartOutput],
+        use_native: bool = False
     ) -> Any:
-        """Create sheet with embedded charts"""
+        """Create sheet with charts (native or embedded images)"""
         ws = wb.create_sheet("Charts")
 
         # Title
@@ -405,42 +407,198 @@ class ExcelExporter:
         row = 3
         chart_count = 0
 
-        for chart in charts:
-            if not chart.success or not chart.base64_data:
-                continue
+        if use_native:
+            # Native Excel charts mode
+            for idx, chart in enumerate(charts):
+                if not chart.success:
+                    continue
 
-            try:
-                # Add chart title
-                ws[f'A{row}'] = chart.title
-                self._apply_style(ws[f'A{row}'], self.styles['subheader'])
-                row += 1
+                try:
+                    # Add chart title
+                    ws[f'A{row}'] = chart.title
+                    self._apply_style(ws[f'A{row}'], self.styles['subheader'])
+                    row += 1
 
-                # Decode base64 image
-                image_data = base64.b64decode(chart.base64_data)
-                image_stream = io.BytesIO(image_data)
+                    # Write chart data to sheet
+                    if chart.chart_data is not None and not chart.chart_data.empty:
+                        data_start_row = row
+                        data_start_col = 1
 
-                # Create Excel image
-                img = Image(image_stream)
-                img.width = 600
-                img.height = 400
+                        # Write data
+                        for r_idx, r in enumerate(dataframe_to_rows(chart.chart_data, index=False, header=True), row):
+                            for c_idx, value in enumerate(r, 1):
+                                value = sanitize_value_for_excel(value)
+                                ws.cell(row=r_idx, column=c_idx, value=value)
 
-                # Position image
-                img.anchor = f'A{row}'
-                ws.add_image(img)
+                        # Create native chart
+                        chart_position = f'E{row}'
+                        native_chart = self._create_native_chart(
+                            ws, chart, data_start_row, data_start_col, chart_position
+                        )
 
-                # Move to next position (leave space for image)
-                row += 22  # Approximate rows for 400px height
-                chart_count += 1
+                        if native_chart:
+                            chart_count += 1
+                            row += len(chart.chart_data) + 3  # Data + spacing
+                        else:
+                            ws[f'A{row}'] = "Chart type not supported for native mode"
+                            row += 2
+                    else:
+                        ws[f'A{row}'] = "No data available for native chart"
+                        row += 2
 
-            except Exception as e:
-                logger.warning(f"Failed to embed chart {chart.title}: {e}")
-                ws[f'A{row}'] = f"Chart embedding failed: {chart.title}"
-                row += 2
+                except Exception as e:
+                    logger.warning(f"Failed to create native chart {chart.title}: {e}")
+                    ws[f'A{row}'] = f"Native chart creation failed: {chart.title}"
+                    row += 2
+
+        else:
+            # Image embedding mode (original behavior)
+            for chart in charts:
+                if not chart.success or not chart.base64_data:
+                    continue
+
+                try:
+                    # Add chart title
+                    ws[f'A{row}'] = chart.title
+                    self._apply_style(ws[f'A{row}'], self.styles['subheader'])
+                    row += 1
+
+                    # Decode base64 image
+                    image_data = base64.b64decode(chart.base64_data)
+                    image_stream = io.BytesIO(image_data)
+
+                    # Create Excel image
+                    img = Image(image_stream)
+                    img.width = 600
+                    img.height = 400
+
+                    # Position image
+                    img.anchor = f'A{row}'
+                    ws.add_image(img)
+
+                    # Move to next position (leave space for image)
+                    row += 22  # Approximate rows for 400px height
+                    chart_count += 1
+
+                except Exception as e:
+                    logger.warning(f"Failed to embed chart {chart.title}: {e}")
+                    ws[f'A{row}'] = f"Chart embedding failed: {chart.title}"
+                    row += 2
 
         if chart_count == 0:
-            ws['A3'] = "No charts available for embedding"
+            ws['A3'] = "No charts available"
 
         return ws
+
+    def _create_native_chart(
+        self,
+        ws: Any,
+        chart_output: ChartOutput,
+        data_start_row: int,
+        data_start_col: int,
+        chart_position: str
+    ) -> Optional[Any]:
+        """
+        Create a native Excel chart using openpyxl
+
+        Args:
+            ws: Worksheet to add chart to
+            chart_output: ChartOutput containing chart data
+            data_start_row: Row where chart data starts
+            data_start_col: Column where chart data starts
+            chart_position: Cell position for chart (e.g., "E5")
+
+        Returns:
+            Chart object or None if failed
+        """
+        if chart_output.chart_data is None or chart_output.chart_data.empty:
+            logger.warning(f"No chart data available for {chart_output.title}")
+            return None
+
+        try:
+            chart = None
+            df = chart_output.chart_data
+            data_rows = len(df) + 1  # Include header
+
+            # Create appropriate chart type
+            if chart_output.chart_type == ChartType.BAR_CHART:
+                chart = BarChart()
+                chart.type = "col"
+                chart.title = chart_output.title
+                chart.style = 10
+                chart.y_axis.title = "Value"
+                chart.x_axis.title = "Category"
+
+                # Data reference (values)
+                data = Reference(ws, min_col=data_start_col + 1, min_row=data_start_row,
+                               max_row=data_start_row + data_rows - 1)
+                # Category reference
+                cats = Reference(ws, min_col=data_start_col, min_row=data_start_row + 1,
+                               max_row=data_start_row + data_rows - 1)
+
+                chart.add_data(data, titles_from_data=True)
+                chart.set_categories(cats)
+
+            elif chart_output.chart_type == ChartType.LINE_CHART:
+                chart = LineChart()
+                chart.title = chart_output.title
+                chart.style = 12
+                chart.y_axis.title = "Value"
+                chart.x_axis.title = "Time/Index"
+
+                # For line charts, use all Y columns
+                y_cols = [col for col in df.columns if '_Y' in col]
+                for idx, y_col in enumerate(y_cols):
+                    col_idx = df.columns.get_loc(y_col) + data_start_col
+                    data = Reference(ws, min_col=col_idx + 1, min_row=data_start_row,
+                                   max_row=data_start_row + data_rows - 1)
+                    chart.add_data(data, titles_from_data=True)
+
+            elif chart_output.chart_type == ChartType.SCATTER_PLOT:
+                chart = ScatterChart()
+                chart.title = chart_output.title
+                chart.style = 13
+                chart.x_axis.title = "X"
+                chart.y_axis.title = "Y"
+
+                # X values
+                x_values = Reference(ws, min_col=data_start_col, min_row=data_start_row + 1,
+                                   max_row=data_start_row + data_rows - 1)
+                # Y values
+                y_values = Reference(ws, min_col=data_start_col + 1, min_row=data_start_row,
+                                   max_row=data_start_row + data_rows - 1)
+
+                series = openpyxl.chart.Series(y_values, x_values, title_from_data=True)
+                chart.series.append(series)
+
+            elif chart_output.chart_type == ChartType.PIE_CHART:
+                chart = PieChart()
+                chart.title = chart_output.title
+                chart.style = 10
+
+                # Data reference
+                data = Reference(ws, min_col=data_start_col + 1, min_row=data_start_row,
+                               max_row=data_start_row + data_rows - 1)
+                # Labels
+                labels = Reference(ws, min_col=data_start_col, min_row=data_start_row + 1,
+                                 max_row=data_start_row + data_rows - 1)
+
+                chart.add_data(data, titles_from_data=True)
+                chart.set_categories(labels)
+
+            else:
+                logger.warning(f"Chart type {chart_output.chart_type} not supported for native charts")
+                return None
+
+            if chart:
+                chart.height = 10  # in cm
+                chart.width = 16   # in cm
+                ws.add_chart(chart, chart_position)
+                return chart
+
+        except Exception as e:
+            logger.error(f"Failed to create native chart {chart_output.title}: {e}")
+            return None
 
     def _create_raw_data_sheet(
         self,

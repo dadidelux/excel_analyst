@@ -27,6 +27,8 @@ def main():
     parser.add_argument("--suggest", "-s", action="store_true", help="Show suggested queries")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--queries-file", "-q", help="File containing queries (one per line)")
+    parser.add_argument("--chart-mode", "-c", choices=["image", "native"], default="image",
+                        help="Chart type: 'image' (PNG embedded) or 'native' (Excel native charts)")
 
     args = parser.parse_args()
 
@@ -69,11 +71,15 @@ def main():
             print("❌ Error: Query is required. Use -p for preview or -s for suggestions.")
             return
 
+        # Create export config with chart mode
+        export_config = ExcelExportConfig(use_native_charts=(args.chart_mode == "native"))
+
         # Handle multiple queries
         if len(queries) > 1:
-            print("🚀 Starting Excel Agent analysis (Multiple Queries Mode)...")
-            print(f"📁 File: {args.csv_file}")
-            print(f"❓ Queries ({len(queries)}):")
+            print("Starting Excel Agent analysis (Multiple Queries Mode)...")
+            print(f"File: {args.csv_file}")
+            print(f"Chart Mode: {args.chart_mode}")
+            print(f"Queries ({len(queries)}):")
             for i, q in enumerate(queries, 1):
                 print(f"   {i}. {q}")
             print()
@@ -81,14 +87,16 @@ def main():
             result = agent.analyze_multiple_queries(
                 csv_file_path=args.csv_file,
                 queries=queries,
-                excel_filename=args.output
+                excel_filename=args.output,
+                export_config=export_config
             )
         else:
             # Single query workflow
             query = queries[0]
-            print("🚀 Starting Excel Agent analysis...")
-            print(f"📁 File: {args.csv_file}")
-            print(f"❓ Query: {query}")
+            print("Starting Excel Agent analysis...")
+            print(f"File: {args.csv_file}")
+            print(f"Chart Mode: {args.chart_mode}")
+            print(f"Query: {query}")
             print()
 
             # Process file and query with progress bar
@@ -100,11 +108,12 @@ def main():
                     csv_file_path=args.csv_file,
                     query=query,
                     excel_filename=args.output,
+                    export_config=export_config,
                     progress_callback=lambda step: (pbar.set_description(step), pbar.update(1))
                 )
 
         # Display results
-        print("📋 Workflow Results:")
+        print("\nWorkflow Results:")
         print("=" * 50)
 
         # Print messages
@@ -113,30 +122,30 @@ def main():
 
         # Print warnings
         if result.warnings:
-            print("\n⚠️  Warnings:")
+            print("\nWarnings:")
             for warning in result.warnings:
                 print(f"   {warning}")
 
         # Print errors
         if result.errors:
-            print("\n❌ Errors:")
+            print("\nErrors:")
             for error in result.errors:
                 print(f"   {error}")
 
         print("\n" + "=" * 50)
 
         if result.success:
-            print("🎉 Analysis completed successfully!")
+            print("Analysis completed successfully!")
             if result.excel_result:
-                print(f"📄 Excel report: {result.excel_result.file_path}")
-                print(f"📊 Sheets: {', '.join(result.excel_result.sheets_created)}")
+                print(f"Excel report: {result.excel_result.file_path}")
+                print(f"Sheets: {', '.join(result.excel_result.sheets_created)}")
         else:
-            print("❌ Analysis failed. Check errors above.")
+            print("Analysis failed. Check errors above.")
             sys.exit(1)
 
         # Verbose output
         if args.verbose:
-            print(f"\n🔍 Detailed Results:")
+            print(f"\nDetailed Results:")
             print(f"   CSV Loaded: {result.csv_loaded}")
             print(f"   Query Parsed: {result.query_parsed}")
             print(f"   Analysis Completed: {result.analysis_completed}")
@@ -153,10 +162,10 @@ def main():
                     print(f"   Insights: {len(analysis.insights)}")
 
     except KeyboardInterrupt:
-        print("\n\n⏹️  Analysis interrupted by user")
+        print("\n\nAnalysis interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Unexpected error: {str(e)}")
+        print(f"\nUnexpected error: {str(e)}")
         sys.exit(1)
 
 

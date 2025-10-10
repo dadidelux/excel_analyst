@@ -68,6 +68,7 @@ class ChartOutput:
     file_path: Optional[str] = None
     base64_data: Optional[str] = None
     html_data: Optional[str] = None
+    chart_data: Optional[pd.DataFrame] = None  # Data for native Excel charts
     metadata: Dict[str, Any] = None
     success: bool = True
     error_message: Optional[str] = None
@@ -371,11 +372,20 @@ class ChartGenerator:
 
         plt.close()
 
+        # Store data for native Excel charts
+        chart_df = None
+        if data:
+            chart_df = pd.DataFrame({
+                'Category': list(data.keys()),
+                'Value': list(data.values())
+            })
+
         return ChartOutput(
             chart_type=ChartType.BAR_CHART,
             title=config.title,
             file_path=str(file_path),
             base64_data=base64_data,
+            chart_data=chart_df,
             success=True
         )
 
@@ -426,11 +436,23 @@ class ChartGenerator:
 
         plt.close()
 
+        # Store data for native Excel charts
+        chart_df = None
+        if data:
+            # Flatten multi-series data into a DataFrame
+            all_series = {}
+            for series_name, series_data in data.items():
+                all_series[f'{series_name}_X'] = series_data.get('x', [])
+                all_series[f'{series_name}_Y'] = series_data.get('y', [])
+            if all_series:
+                chart_df = pd.DataFrame(all_series)
+
         return ChartOutput(
             chart_type=ChartType.LINE_CHART,
             title=config.title,
             file_path=str(file_path),
             base64_data=base64_data,
+            chart_data=chart_df,
             success=True
         )
 
@@ -482,11 +504,20 @@ class ChartGenerator:
 
         plt.close()
 
+        # Store data for native Excel charts
+        chart_df = None
+        if data and data.get('x') and data.get('y'):
+            chart_df = pd.DataFrame({
+                'X': data['x'],
+                'Y': data['y']
+            })
+
         return ChartOutput(
             chart_type=ChartType.SCATTER_PLOT,
             title=config.title,
             file_path=str(file_path),
             base64_data=base64_data,
+            chart_data=chart_df,
             success=True
         )
 

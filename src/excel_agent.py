@@ -262,7 +262,8 @@ class ExcelAgent:
         self,
         csv_file_path: str,
         queries: List[str],
-        excel_filename: Optional[str] = None
+        excel_filename: Optional[str] = None,
+        export_config: Optional[ExcelExportConfig] = None
     ) -> AgentWorkflowResult:
         """
         Process multiple queries against the same dataset
@@ -323,11 +324,15 @@ class ExcelAgent:
 
             # Export to Excel
             if all_analyses:
+                if not export_config:
+                    export_config = ExcelExportConfig()
+
                 excel_result = self.excel_exporter.export_analysis_to_excel(
                     analysis_results=all_analyses,
                     charts=all_charts,
                     raw_data=df,
                     metadata=result.metadata,
+                    config=export_config,
                     filename=excel_filename
                 )
 
